@@ -42,7 +42,14 @@ local nvals_terrain = {}
 
 local data = {}
 
-biomegen.set_elevation_chill(0.35)
+-- Detect the biomegen mod if loaded, in order to generate biomes
+-- and decorations
+
+local use_biomegen = false
+if minetest.global_exists("biomegen") then
+	use_biomegen = true
+	biomegen.set_elevation_chill(0.35)
+end
 
 -- On generated function.
 
@@ -121,18 +128,24 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	end
 	end
 
-	-- Generate biomes
-	biomegen.generate_biomes(data, area, minp, maxp)
+	if use_biomegen then
+		-- Generate biomes in 'data', using biomegen mod
+		biomegen.generate_biomes(data, area, minp, maxp)
 
-	-- After processing, write content ID data back to the voxelmanip.
-	vm:set_data(data)
-	-- Generate biomes and ores in the VM
-	minetest.generate_ores(vm, minp, maxp)
-	biomegen.place_all_decos(data, area, vm, minp, maxp, seed)
-	-- Update data array
-	vm:get_data(data)
-	-- Add biome dust
-	biomegen.dust_top_nodes(vm, data, area, minp, maxp)
+		-- Write content ID data back to the voxelmanip.
+		vm:set_data(data)
+		-- Generate ores using core's function
+		minetest.generate_ores(vm, minp, maxp)
+		-- Generate decorations in VM (needs 'data' for reading)
+		biomegen.place_all_decos(data, area, vm, minp, maxp, seed)
+		-- Update data array to have ores/decorations
+		vm:get_data(data)
+		-- Add biome dust in VM (needs 'data' for reading)
+		biomegen.dust_top_nodes(vm, data, area, minp, maxp)
+	else
+		-- If biomegen is not present, just write content ID data back to the VM.
+		vm:set_data(data)
+	end
 
 	-- Calculate lighting for what has been created.
 	vm:calc_lighting()
