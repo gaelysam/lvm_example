@@ -21,7 +21,7 @@ minetest.set_mapgen_params({mgname = "singlenode", flags = "nolight"})
 
 -- Get the content IDs for the nodes used.
 
-local c_sandstone = minetest.get_content_id("default:sandstone")
+local c_stone     = minetest.get_content_id("default:stone")
 local c_water     = minetest.get_content_id("default:water_source")
 
 
@@ -42,6 +42,7 @@ local nvals_terrain = {}
 
 local data = {}
 
+biomegen.set_elevation_chill(0.35)
 
 -- On generated function.
 
@@ -104,7 +105,7 @@ minetest.register_on_generated(function(minp, maxp, seed)
 			local density_gradient = (1 - y) / 128
 			-- Place solid nodes when 'density' > 0.
 			if density_noise + density_gradient > 0 then
-				data[vi] = c_sandstone
+				data[vi] = c_stone
 			-- Otherwise if at or below water level place water.
 			elseif y <= 1 then
 				data[vi] = c_water
@@ -120,8 +121,19 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	end
 	end
 
+	-- Generate biomes
+	biomegen.generate_biomes(data, area, minp, maxp)
+
 	-- After processing, write content ID data back to the voxelmanip.
 	vm:set_data(data)
+	-- Generate biomes and ores in the VM
+	minetest.generate_ores(vm, minp, maxp)
+	biomegen.place_all_decos(data, area, vm, minp, maxp, seed)
+	-- Update data array
+	vm:get_data(data)
+	-- Add biome dust
+	biomegen.dust_top_nodes(vm, data, area, minp, maxp)
+
 	-- Calculate lighting for what has been created.
 	vm:calc_lighting()
 	-- Write what has been created to the world.
