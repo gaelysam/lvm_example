@@ -146,7 +146,6 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	vm:set_data(data)
 
 	-- Generate biomes
-	minetest.calc_biome_noise(minp)
 	minetest.generate_biomes(vm, {x=minp.x, y=minp.y-1, z=minp.z}, maxp, nobj_filler_depth)
 
 	-- Generate ores
