@@ -56,6 +56,11 @@ local nvals_terrain = {}
 
 local data = {}
 
+local use_biomegen = minetest.global_exists("biomegen")
+local timer_sum = 0
+local timer_sum2 = 0
+local timer_n = 0
+
 
 -- On generated function.
 
@@ -143,16 +148,28 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	end
 
 	-- After processing, write content ID data back to the voxelmanip.
-	vm:set_data(data)
+	if not use_biomegen then
+		vm:set_data(data)
+	end
 
-	-- Generate biomes
-	minetest.generate_biomes(vm, {x=minp.x, y=minp.y-1, z=minp.z}, maxp, nobj_filler_depth)
+	local t1 = os.clock()
+	if use_biomegen then
+		biomegen.generate_biomes(data, area, {x=minp.x, y=minp.y-1, z=minp.z}, maxp)
+	else
+		-- Generate biomes
+		minetest.generate_biomes(vm, {x=minp.x, y=minp.y-1, z=minp.z}, maxp, nobj_filler_depth)
+	end
+	local t2 = os.clock()
+
+	if use_biomegen then
+		vm:set_data(data)
+	end
 
 	-- Generate ores
-	minetest.generate_ores(vm, minp, maxp)
+	--minetest.generate_ores(vm, minp, maxp)
 
 	-- Generate decorations (plants...)
-	minetest.generate_decorations(vm, minp, maxp)
+	--minetest.generate_decorations(vm, minp, maxp)
 
 	-- Calculate lighting for what has been created.
 	vm:calc_lighting()
@@ -164,4 +181,17 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	-- Print generation time of this mapchunk.
 	local chugent = math.ceil((os.clock() - t0) * 1000)
 	print ("[lvm_example] Mapchunk generation time " .. chugent .. " ms")
+
+	local t_biomes = t2-t1
+	timer_n = timer_n + 1
+	timer_sum = timer_sum + t_biomes
+	timer_sum2 = timer_sum2 + t_biomes*t_biomes
+end)
+
+minetest.register_on_shutdown(function()
+	local avg = timer_sum/timer_n
+	local std = math.sqrt(timer_sum2/timer_n - avg*avg)
+	print(string.format("Biomegen calls: %d", timer_n))
+	print(string.format("Biomegen mean time: %5.3f ms", avg * 1000))
+	print(string.format("Biomegen time std: %5.3f ms", std * 1000))
 end)
