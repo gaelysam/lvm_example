@@ -10,6 +10,9 @@ local np_terrain = {
 	--flags = ""
 }
 
+-- Dirt thickness noise for biome system
+local np_filler_depth = minetest.get_mapgen_setting_noiseparams("mg_biome_np_filler_depth")
+
 -- Set singlenode mapgen (air nodes only).
 -- Disable the engine lighting calculation since that will be done for a
 -- mapchunk of air nodes and will be incorrect after we place nodes.
@@ -26,17 +29,16 @@ end)
 -- Initialize noise object to nil. It will be created once only during the
 -- generation of the first mapchunk, to minimise memory use.
 local nobj_terrain = nil
+local nobj_filler_depth = nil
 
 -- Localise noise buffer table outside the loop, to be re-used for all
 -- mapchunks, therefore minimising memory use.
 local nvals_terrain = {}
+-- nvals for filler_depth noise is calculated internally
 
 -- Localise data buffer table outside the loop, to be re-used for all
 -- mapchunks, therefore minimising memory use.
 local data = {}
-
--- Whether the 'biomegen' mod exists.
-local use_biomegen = minetest.get_modpath('biomegen')
 
 -- On generated function.
 
@@ -56,6 +58,8 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	-- the first mapchunk when 'nobj_terrain' is 'nil'.
 	nobj_terrain = nobj_terrain or
 		minetest.get_perlin_map(np_terrain, permapdims3d)
+	nobj_filler_depth = nobj_filler_depth or
+		minetest.get_perlin_map(np_filler_depth, {x=permapdims3d.x, y=permapdims3d.z})
 	-- Create a flat array of noise values from the perlin map, with the
 	-- minimum point being 'minp'.
 	-- Set the buffer parameter to use and reuse 'nvals_terrain' for this.
@@ -115,14 +119,19 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	end
 	end
 
-	if use_biomegen then
-		-- Generate biomes, decorations, ores and dust using biomegen.
-		-- It will also call :set_data() for us.
-		biomegen.generate_all(data, area, vm, minp, maxp, seed)
-	else
-		-- After processing, write content ID data back to the voxelmanip.
-		vm:set_data(data)
-	end
+	-- After processing, write content ID data back to the voxelmanip.
+	vm:set_data(data)
+
+	-- Generate biomes in the voxelmanip
+	-- (need 1 extra node down to avoid border effects)
+	minetest.generate_biomes(vm, {x=minp.x, y=minp.y-1, z=minp.z}, maxp, nobj_filler_depth)
+	-- Same for ores
+	minetest.generate_ores(vm, minp, maxp)
+	-- And decorations (trees, plants...)
+	minetest.generate_decorations(vm, minp, maxp)
+	-- And dust (snow...)
+	-- (start 1 node lower because the node above must be already generated)
+	minetest.generate_biome_dust(vm, minp, {x=maxp.x, y=maxp.y-1, z=maxp.z})
 
 	-- Calculate lighting for what has been created.
 	vm:calc_lighting()
